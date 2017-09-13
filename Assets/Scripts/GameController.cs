@@ -3,18 +3,16 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class GameController : MonoBehaviour {
-    public int MazeWidth = 4;
-    public int MazeDepth = 4;
+    public int MazeWidth = 1;
+    public int MazeDepth = 1;
     public Transform RoomObject;
-    public int visitedCount = 0;
-    public Stack<Transform> visitedRooms;
-    public int finishedCount = 0;
-    public int roomWidth = 4;
-    public int roomDepth = 4;
     public Transform startRoom;
     public Transform roomContainer;
+    public Transform player;
     public List<string> AllDirections = new List<string> { "north", "east", "south", "west" };
-    
+
+    private int roomWidth = 4;
+    private int roomDepth = 4;
     private int MazeStartX;
     private int MazeStartZ;
     private Transform[,] room2dArray;
@@ -23,57 +21,10 @@ public class GameController : MonoBehaviour {
 	void Start () {
         MazeStartX = (int) -System.Math.Floor((double) (MazeWidth / 2)) * roomWidth;
         MazeStartZ = (int) System.Math.Floor((double) (MazeDepth / 2)) * roomDepth;
-        visitedRooms = new Stack<Transform>();
 
         room2dArray = new Transform[MazeWidth, MazeDepth];
         roomContainer = GameObject.Find("RoomContainer").transform;
-
-        //BuildMapGrid();
-        CreateMaze();
-    }
-
-    void BuildMapGrid() {
-        for(var z = 0; z < MazeDepth; z++)
-        {
-            for(var x = 0; x < MazeWidth; x++)
-            {
-                var room = Instantiate(RoomObject);
-                int roomX = MazeStartX + (x * roomWidth);
-                int roomZ = MazeStartZ + (z * roomDepth);
-
-                room.name = "RoomObject_" + x + "_" + z;
-                room.parent = roomContainer;
-                room.transform.position = new Vector3(roomX, 0, roomZ);
-
-                // Set up the available directions.
-                var directions = new List<string> { "north", "east", "south", "west" };
-                if (x == 0)
-                {
-                    directions.Remove("west");
-                }
-                if (x == MazeWidth - 1)
-                {
-                    directions.Remove("east");
-                }
-                if (z == 0)
-                {
-                    //directions.Remove("south");
-                }
-                if (z == MazeDepth - 1)
-                {
-                    directions.Remove("north");
-                }
-
-                var roomScript = room.GetComponent<Room>();
-                roomScript.SetPossibleDirections(directions);
-                roomScript.SetLocation(x, z);
-
-                room2dArray[x, z] = room;
-                
-            }
-        }
-        Debug.Log("Done creating rooms.");
-
+        
         CreateMaze();
     }
 
@@ -83,18 +34,22 @@ public class GameController : MonoBehaviour {
         int startZ = Random.Range(0,2) * (MazeDepth-1);
 
         Debug.Log("Map start room: " + startX + "," + startZ);
-        
-        // Set the location of the main camera.
-        var camera = GameObject.Find("Main Camera").transform;
-        camera.position = new Vector3(startX, camera.position.y, startZ);
 
         // Loop through all the rooms until every room has been visited and confirmed finished.
-        CreateRoom(startX, startZ);
+        Transform startRoom = CreateRoom(startX, startZ);
+
+        // Set the location of the main camera.
+        var camera = GameObject.Find("Main Camera").transform;
+        camera.position = new Vector3(startRoom.transform.position.x, camera.position.y, startRoom.transform.position.z);
+
+        var player = GameObject.Find("Player").transform;
+        player.position = new Vector3(startRoom.transform.position.x, player.position.y, startRoom.transform.position.z);
+
 
         Debug.Log("Went through all the rooms.");       
     }
 
-    private void CreateRoom(int x, int z, string movedDirection = null)
+    private Transform CreateRoom(int x, int z, string movedDirection = null)
     {
         int movedDirectionIndex = AllDirections.IndexOf(movedDirection);
         string previousRoomDirection = (movedDirection != null)? AllDirections[(movedDirectionIndex + 2) % 4] : null;
@@ -201,53 +156,8 @@ public class GameController : MonoBehaviour {
             availableDirections = roomScript.AvailableDirections();
         }
 
-        return;
+        return room;
 
-    }
-
-    private Transform RoomRecursion(Transform currentRoom)
-    {
-        currentRoom.gameObject.SetActive(true);
-
-        var currentRoomScript = currentRoom.GetComponent<Room>();
-
-        currentRoomScript.visited = true;
-
-        var availableDirections = currentRoomScript.AvailableDirections();
-
-        if(availableDirections.Count > 0)
-        {
-            bool foundNeighbor = false;
-            var directionIndex = Random.Range(0, availableDirections.Count);
-            var direction = availableDirections[directionIndex];
-            var directionOppositIndex = (directionIndex + 2) % 4;
-            var directionOpposite = AllDirections[directionOppositIndex];
-            var neighborRoom = GetNeighborRoom(currentRoomScript, direction);
-            var neighborRoomScript = neighborRoom.GetComponent<Room>();
-
-            while(foundNeighbor == false && availableDirections.Count > 0)
-            {
-                if (neighborRoomScript.visited == false)
-                {
-                    foundNeighbor = true;
-                    currentRoomScript.OpenDirection(direction, neighborRoom);
-                    neighborRoomScript.OpenDirection(directionOpposite, currentRoom);
-                }
-                else
-                {
-                    currentRoomScript.RemovePossibleDirection(direction);
-                    availableDirections = currentRoomScript.AvailableDirections();
-                }
-            }
-
-            // Recurse with the neighbor room.
-            if(foundNeighbor)
-            {
-                RoomRecursion(neighborRoom);
-            }
-        }
-
-        return currentRoom;
     }
 
     private Transform GetNeighborRoom(Room currentRoomScript, string direction)
